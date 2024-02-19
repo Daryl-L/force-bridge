@@ -1,3 +1,5 @@
+import { Script } from '@ckb-lumos/base';
+import { computeScriptHash } from '@ckb-lumos/base/lib/utils';
 import axios from 'axios';
 import bitcore from 'bitcore-lib';
 import { RPCClient } from 'rpc-bitcoin';
@@ -15,6 +17,7 @@ import {
   IVin,
   IVout,
   MainnetFee,
+  Multisig,
 } from '../../xchain/btc/type';
 
 const Unit = bitcore.Unit;
@@ -34,7 +37,7 @@ export class BTCChain {
     const clientParams = config.clientParams;
     const privKeys = config.privateKeys;
     this.multiPrivKeys = privKeys.map((pk) => new bitcore.PrivateKey(pk.slice(2)));
-    this.multiPubkeys = this.multiPrivKeys.map((pk) => pk.toPublicKey());
+    this.multiPubkeys = config.verifierPublicKeys;
     const multiAddress = bitcore.Address.createMultisig(this.multiPubkeys, 2, 'testnet').toString();
     logger.debug(
       `the multi sign address by calc privkeys is : ${multiAddress}. the provider lock address is ${config.lockAddress}`,
@@ -46,6 +49,17 @@ export class BTCChain {
     }
     this.multiAddress = multiAddress;
     this.rpcClient = new RPCClient(clientParams);
+  }
+
+  async createMultisigAddressFromCKBLockscript(lock: Script): Promise<Multisig> {
+    const lockHash = computeScriptHash(lock);
+    const multisig: Multisig = await this.rpcClient.createmultisig({
+      nrequired: 3,
+      keys: [lockHash, ...this.multiPubkeys],
+      address_type: 'p2sh-segwit',
+    });
+
+    return multisig;
   }
 
   async watchBtcTxEvents(

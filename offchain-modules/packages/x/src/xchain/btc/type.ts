@@ -79,3 +79,9 @@ export interface MainnetFee {
   halfHourFee: number;
   hourFee: number;
 }
+
+export interface Multisig {
+  address: string;
+  redeemScript: string;
+  descriptor: string;
+}

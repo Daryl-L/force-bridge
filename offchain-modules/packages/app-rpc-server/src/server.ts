@@ -6,11 +6,13 @@ import { getDBConnection } from '@force-bridge/x/dist/utils';
 import { logger } from '@force-bridge/x/dist/utils/logger';
 import bodyParser from 'body-parser';
 import { JSONRPCServer } from 'json-rpc-2.0';
+import { BTCAPI } from './btc';
 import { ForceBridgeAPIV1Handler } from './handler';
 import {
   GenerateBridgeInTransactionPayload,
   GetBalancePayload,
   GetBridgeTransactionSummariesPayload,
+  LoginPayload,
   XChainNetWork,
 } from './types/apiv1';
 
@@ -52,6 +54,11 @@ export async function startRpcServer(configPath: string): Promise<void> {
   // @ts-ignore
   server.addMethod('version', () => {
     return version;
+  });
+  server.addMethod('Login', async (payload: LoginPayload) => {
+    if (forceBridgeRpc instanceof BTCAPI) {
+      return await forceBridgeRpc.login(payload);
+    }
   });
   server.addMethod('generateBridgeOutNervosTransaction', forceBridgeRpc.generateBridgeOutNervosTransaction);
   server.addMethod('sendSignedTransaction', forceBridgeRpc.sendSignedTransaction);

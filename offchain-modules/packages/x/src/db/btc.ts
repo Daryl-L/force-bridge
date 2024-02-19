@@ -1,6 +1,7 @@
 // invoke in BTC handler
 import { Connection, Not, Repository } from 'typeorm';
 import { ForceBridgeCore } from '../core';
+import { Account } from './entity/Account';
 import { BtcUnlockStatus } from './entity/BtcUnlock';
 import {
   BtcLock,
@@ -19,11 +20,24 @@ export class BtcDb implements IQuery {
   private ckbMintRepository: Repository<CkbMint>;
   private btcLockRepository: Repository<BtcLock>;
   private btcUnlockRepository: Repository<BtcUnlock>;
+  private btcAccountRepository: Repository<Account>;
 
   constructor(private connection: Connection) {
     this.ckbMintRepository = connection.getRepository(CkbMint);
     this.btcLockRepository = connection.getRepository(BtcLock);
     this.btcUnlockRepository = connection.getRepository(BtcUnlock);
+    this.btcAccountRepository = connection.getRepository(Account);
+  }
+
+  async createBtcAccount(ckbAddress: string, lockHash: string, btcAddress: string): Promise<void> {
+    const account = this.btcAccountRepository.create({ ckbAddress, ckbLockHash: lockHash, btcAddress });
+    await this.btcAccountRepository.save(account);
+  }
+
+  async getBtcAccountByCkbAddress(ckbAddress: string, lockHash: string): Promise<Account | undefined> {
+    const accounts = await this.btcAccountRepository.find({ ckbLockHash: lockHash });
+
+    return accounts.find((account) => account.ckbAddress === ckbAddress);
   }
 
   async getLatestHeight(): Promise<number> {

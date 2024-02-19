@@ -1112,6 +1112,11 @@
     "@types/yargs" "^15.0.0"
     chalk "^4.0.0"
 
+"@joyid/ckb@0.0.3":
+  version "0.0.3"
+  resolved "https://registry.yarnpkg.com/@joyid/ckb/-/ckb-0.0.3.tgz#1bda1ed0ef892be2e1fd1837e7e6cc9f28921bd6"
+  integrity sha512-x5zEjeV7oJYRFTAMNcI4YYN2H+5nNoXHnkGEkA5NRA65SDIWf6n2kJbASoTmE4ULdCHtQq7bLBBBMrBUsJO4kg==
+
 "@jridgewell/gen-mapping@^0.3.0", "@jridgewell/gen-mapping@^0.3.2":
   version "0.3.3"
   resolved "https://registry.yarnpkg.com/@jridgewell/gen-mapping/-/gen-mapping-0.3.3.tgz#7e02e6eb5df901aaedb08514203b096614024098"

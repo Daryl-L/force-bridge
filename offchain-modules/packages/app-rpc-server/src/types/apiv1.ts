@@ -136,6 +136,15 @@ export interface GetBridgeConfigResponse {
   };
 }
 
+export interface LoginPayload {
+  ckbAddress: string;
+}
+
+export interface LoginResponse {
+  xchainAddress: string;
+  ckbAddress: string;
+}
+
 // TODO: change to the higher order generic when it impl
 // https://github.com/microsoft/TypeScript/issues/1213
 export interface ForceBridgeAPIV1 {
