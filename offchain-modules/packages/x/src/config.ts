@@ -87,6 +87,7 @@ export interface TronConfig {
 }
 
 export interface BtcConfig {
+  assetWhiteList: WhiteListAsset[];
   clientParams: {
     url: string;
     user: string;
@@ -144,12 +145,15 @@ export interface promConfig {
   metricPort: number;
 }
 
-export interface WhiteListEthAsset {
-  address: string;
+export interface WhiteListEthAsset extends WhiteListAsset {
   name: string;
   symbol: string;
   logoURI: string;
   decimal: number;
+}
+
+export interface WhiteListAsset {
+  address: string;
   minimalBridgeAmount: string;
   bridgeFee: { in: string; out: string };
 }

@@ -84,7 +84,17 @@ export class BTCAPI implements ForceBridgeAPIV1 {
     payload: GetBridgeTransactionStatusPayload,
   ) => Promise<GetBridgeTransactionStatusResponse>;
 
-  getMinimalBridgeAmount: (payload: GetMinimalBridgeAmountPayload) => Promise<GetMinimalBridgeAmountResponse>;
+  getMinimalBridgeAmount = async (payload: GetMinimalBridgeAmountPayload): Promise<GetMinimalBridgeAmountResponse> => {
+    const { xchainAssetIdent } = payload;
+    const asset = ForceBridgeCore.config.btc.assetWhiteList.find((asset) => asset.address === xchainAssetIdent);
+    if (!asset) {
+      throw new Error('minimal amount not configured');
+    }
+
+    return {
+      minimalAmount: asset.minimalBridgeAmount,
+    };
+  };
 
   getBridgeInNervosBridgeFee: (
     payload: GetBridgeInNervosBridgeFeePayload,
