@@ -3,7 +3,7 @@ import { ForceBridgeCore } from '@force-bridge/x/dist/core';
 import { BtcDb } from '@force-bridge/x/dist/db';
 import { BTCChain } from '@force-bridge/x/dist/xchain/btc';
 import { Connection } from 'typeorm';
-import { NetworkBase, RequiredAsset } from './types';
+import { AssetType, NetworkBase, RequiredAsset } from './types';
 import {
   ForceBridgeAPIV1,
   GenerateBridgeInTransactionPayload,
@@ -28,6 +28,7 @@ import {
   TransactionSummaryWithStatus,
   XChainNetWork,
 } from './types/apiv1';
+import { btcBalance, nervosBalance } from './utils/balance';
 
 const isJoyId = (lock: Script) => {
   return (
@@ -99,7 +100,23 @@ export class BTCAPI implements ForceBridgeAPIV1 {
 
   getAssetList: (name?: string | undefined) => Promise<RequiredAsset<'info'>[]>;
 
-  getBalance: (payload: GetBalancePayload) => Promise<GetBalanceResponse>;
+  getBalance = async (payload: GetBalancePayload): Promise<GetBalanceResponse> => {
+    const balanceFutures: Promise<AssetType>[] = [];
+    for (const { network, userIdent, assetIdent } of payload) {
+      switch (network) {
+        case 'Bitcoin':
+          balanceFutures.push(btcBalance(userIdent));
+          break;
+        case 'Nervos':
+          balanceFutures.push(nervosBalance(userIdent, assetIdent));
+          break;
+        default:
+          continue;
+      }
+    }
+
+    return ((await Promise.all(balanceFutures)) as unknown) as Promise<GetBalanceResponse>;
+  };
 
   getBridgeConfig: () => Promise<GetBridgeConfigResponse>;
 }
