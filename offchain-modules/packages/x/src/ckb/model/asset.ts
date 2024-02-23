@@ -2,7 +2,12 @@ import { computeScriptHash } from '@ckb-lumos/base/lib/utils';
 import { BigNumber } from 'bignumber.js';
 import { ForceBridgeCore } from '../../core';
 import { fromHexString, stringToUint8Array, toHexString } from '../../utils';
-import { SerializeForceBridgeLockscriptArgs } from '../tx-helper/generated/force_bridge_lockscript';
+import {
+  SerializeByte32,
+  SerializeBytes,
+  SerializeForceBridgeLockscriptArgs,
+  serializeTable,
+} from '../tx-helper/generated/force_bridge_lockscript';
 import { ScriptLike } from './script';
 
 export enum ChainType {
@@ -202,12 +207,14 @@ export class BtcAsset extends Asset {
   }
 
   toBridgeLockscriptArgs(): string {
-    const params = {
-      owner_cell_type_hash: fromHexString(this.ownerCellTypeHash).buffer,
-      chain: this.chainType,
-      asset: fromHexString(toHexString(stringToUint8Array(this.address))).buffer,
-    };
-    return `0x${toHexString(new Uint8Array(SerializeForceBridgeLockscriptArgs(params)))}`;
+    const buffers: ArrayBuffer[] = [];
+    buffers.push(SerializeByte32(fromHexString(this.ownerCellTypeHash).buffer));
+    const chainView = new DataView(new ArrayBuffer(1));
+    chainView.setUint8(0, this.chainType);
+    buffers.push(chainView.buffer);
+    buffers.push(SerializeBytes(fromHexString(toHexString(stringToUint8Array(this.address))).buffer));
+    const args = serializeTable(buffers);
+    return `0x${toHexString(new Uint8Array(args))}`;
   }
 
   getAddress(): string {

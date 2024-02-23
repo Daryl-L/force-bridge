@@ -114,6 +114,7 @@ export async function deployDev(
     );
     logger.info('deps', { contractsDeps, sudtDep });
     ckbDeps = {
+      xudtType: sudtDep,
       sudtType: sudtDep,
       pwLock: pwLockDep,
       ...contractsDeps,

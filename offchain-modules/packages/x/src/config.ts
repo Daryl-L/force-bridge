@@ -32,6 +32,7 @@ export interface CkbDeps {
   bridgeLock: ConfigItem;
   recipientType: ConfigItem;
   sudtType: ConfigItem;
+  xudtType: ConfigItem;
   pwLock?: ConfigItem;
   omniLock?: ConfigItem;
   joyId?: ConfigItem;
@@ -104,6 +105,7 @@ export interface BtcConfig {
   confirmNumber: number;
   multiSigN: number;
   verifierPublicKeys: string[];
+  xudtFlag: string;
 }
 
 export interface logConfig {

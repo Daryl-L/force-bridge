@@ -1,6 +1,7 @@
 import { utils, helpers, Script } from '@ckb-lumos/lumos';
 import { ForceBridgeCore } from '@force-bridge/x/dist/core';
 import { BtcDb } from '@force-bridge/x/dist/db';
+import { LockRecord, UnlockRecord } from '@force-bridge/x/dist/db/model';
 import { BTCChain } from '@force-bridge/x/dist/xchain/btc';
 import { Connection } from 'typeorm';
 import { AssetType, NetworkBase, RequiredAsset } from './types';
@@ -29,6 +30,7 @@ import {
   XChainNetWork,
 } from './types/apiv1';
 import { btcBalance, nervosBalance } from './utils/balance';
+import { transferDbRecordToResponse } from './utils/helper';
 
 const isJoyId = (lock: Script) => {
   return (
@@ -104,9 +106,30 @@ export class BTCAPI implements ForceBridgeAPIV1 {
     payload: GetBridgeOutNervosBridgeFeePayload,
   ) => Promise<GetBridgeOutNervosBridgeFeeResponse>;
 
-  getBridgeTransactionSummaries: (
+  getBridgeTransactionSummaries = async (
     payload: GetBridgeTransactionSummariesPayload<XChainNetWork>,
-  ) => Promise<TransactionSummaryWithStatus[]>;
+  ): Promise<TransactionSummaryWithStatus[]> => {
+    const { user, xchainAssetIdent, network } = payload;
+    const { ident, network: userNetwork } = user;
+    const dbHandler = new BtcDb(this.#connection);
+    let lockRecords: LockRecord[] = [];
+    let unlockRecords: UnlockRecord[] = [];
+    switch (userNetwork) {
+      case 'Bitcoin':
+        lockRecords = await dbHandler.getLockRecordsByCkbAddress(ident, xchainAssetIdent);
+        unlockRecords = await dbHandler.getUnlockRecordsByCkbAddress(ident, xchainAssetIdent);
+        break;
+      case 'Nervos':
+        lockRecords = await dbHandler.getLockRecordsByCkbAddress(ident, xchainAssetIdent);
+        unlockRecords = await dbHandler.getUnlockRecordsByCkbAddress(ident, xchainAssetIdent);
+        break;
+      default:
+        throw new Error('invalid address chain type');
+    }
+    return lockRecords
+      .map((lockRecord) => transferDbRecordToResponse(network, lockRecord))
+      .concat(unlockRecords.map((unlockRecord) => transferDbRecordToResponse(network, unlockRecord)));
+  };
 
   getAssetList: (name?: string | undefined) => Promise<RequiredAsset<'info'>[]>;
 

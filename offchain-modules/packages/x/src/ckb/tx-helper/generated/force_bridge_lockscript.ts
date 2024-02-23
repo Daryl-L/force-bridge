@@ -57,7 +57,7 @@ function verifyAndExtractOffsets(view: DataView, expectedFieldCount, compatible)
   return offsets;
 }
 
-function serializeTable(buffers) {
+export function serializeTable(buffers) {
   const itemCount = buffers.length;
   let totalSize = 4 * (itemCount + 1);
   const offsets: number[] = [];

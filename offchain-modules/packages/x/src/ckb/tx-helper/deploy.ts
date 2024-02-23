@@ -1,5 +1,5 @@
-import { Cell, HashType, OutPoint, Script } from '@ckb-lumos/base';
-import { utils as lumosUtils } from '@ckb-lumos/base';
+import { Cell, HashType, OutPoint, Script, utils as lumosUtils } from '@ckb-lumos/base';
+
 import { ScriptType } from '@ckb-lumos/ckb-indexer/src/type';
 import { common, deploy } from '@ckb-lumos/common-scripts';
 import { key } from '@ckb-lumos/hd';

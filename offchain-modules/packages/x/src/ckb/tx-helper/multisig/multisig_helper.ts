@@ -1,4 +1,5 @@
 import { HexString, Script } from '@ckb-lumos/base';
+import { computeScriptHash } from '@ckb-lumos/base/lib/utils';
 import { multisigArgs, serializeMultisigScript } from '@ckb-lumos/common-scripts/lib/from_info';
 import { getConfig } from '@ckb-lumos/config-manager';
 import { key } from '@ckb-lumos/hd';
@@ -38,7 +39,7 @@ export function getOwnLockHash(multisigScript: MultisigItem): string {
 }
 
 export function getOwnerTypeHash(): string {
-  const ownerTypeHash = ForceBridgeCore.ckb.utils.scriptToHash(<CKBComponents.Script>{
+  const ownerTypeHash = computeScriptHash({
     codeHash: ForceBridgeCore.config.ckb.ownerCellTypescript.codeHash,
     hashType: ForceBridgeCore.config.ckb.ownerCellTypescript.hashType,
     args: ForceBridgeCore.config.ckb.ownerCellTypescript.args,
