@@ -49,6 +49,7 @@ export interface CkbConfig {
   startBlockHeight: number;
   confirmNumber: number;
   sudtSize: number;
+  xudtSize: number;
 }
 
 export interface EthConfig {

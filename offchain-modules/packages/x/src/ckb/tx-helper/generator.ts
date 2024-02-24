@@ -42,6 +42,7 @@ export class CkbTxGenerator extends CkbTxHelper {
     },
     depType: ForceBridgeCore.config.ckb.deps.xudtType.cellDep.depType,
   };
+
   sudtDep = {
     outPoint: {
       txHash: ForceBridgeCore.config.ckb.deps.sudtType.cellDep.outPoint.txHash,
@@ -145,6 +146,57 @@ export class CkbTxGenerator extends CkbTxHelper {
         return txSkeleton;
       } catch (e) {
         logger.error(`CkbHandler createBridgeCell exception error:${e.message}, stack: ${e.stack}`);
+        await asyncSleep(3000);
+      }
+    }
+  }
+
+  async mintBTC(records: MintAssetRecord[]): Promise<TransactionSkeletonType> {
+    for (;;) {
+      try {
+        const fromAddress = getFromAddr();
+        let txSkeleton = TransactionSkeleton({
+          cellProvider: {
+            collector: (queryOptions) =>
+              this.indexer.collector({ ...queryOptions, type: 'empty', data: { data: '0x', searchMode: 'exact' } }),
+          },
+        });
+        const multisigCell = await this.fetchMultisigCell();
+        if (multisigCell === undefined) {
+          logger.error(`CkbHandler mint fetchMultiSigCell failed: cannot found multiSig cell`);
+          await asyncSleep(3000);
+          continue;
+        }
+        txSkeleton = await common.setupInputCell(txSkeleton, multisigCell, ForceBridgeCore.config.ckb.multisigScript);
+        txSkeleton = txSkeleton.update('cellDeps', (cellDeps) => {
+          return cellDeps.push(this.xudtDep);
+        });
+
+        const mintWitness = this.getMintWitness(records);
+        const mintWitnessArgs = bytes.hexify(WitnessArgs.pack({ inputType: mintWitness }));
+        txSkeleton = txSkeleton.update('witnesses', (witnesses) => {
+          if (witnesses.isEmpty()) {
+            return witnesses.push(`0x${mintWitnessArgs}`);
+          }
+          const witnessArgs = WitnessArgs.unpack(bytes.bytify(witnesses.get(0) as string));
+          const newWitnessArgs: IWitnessArgs = {
+            inputType: `0x${toHexString(new Uint8Array(mintWitness))}`,
+          };
+          if (witnessArgs.lock) {
+            newWitnessArgs.lock = new Reader(witnessArgs.lock).serializeJson();
+          }
+          if (witnessArgs.outputType) {
+            newWitnessArgs.outputType = new Reader(witnessArgs.outputType).serializeJson();
+          }
+          return witnesses.set(0, bytes.hexify(WitnessArgs.pack(newWitnessArgs)));
+        });
+
+        txSkeleton = await this.buildXUDTOutput(txSkeleton, records);
+        txSkeleton = await this.completeTx(txSkeleton, fromAddress);
+        txSkeleton = common.prepareSigningEntries(txSkeleton);
+        return txSkeleton;
+      } catch (e) {
+        logger.error(`CkbHandler mint exception error:${e.message}, stack: ${e.stack}`);
         await asyncSleep(3000);
       }
     }
@@ -269,6 +321,55 @@ export class CkbTxGenerator extends CkbTxHelper {
       outputSudtCell.cellOutput.capacity = `0x${sudtCapacity.toString(16)}`;
       txSkeleton = txSkeleton.update('outputs', (outputs) => {
         return outputs.push(outputSudtCell);
+      });
+    }
+    for (let i = 1; i <= records.length; i++) {
+      txSkeleton = txSkeleton.update('fixedEntries', (fixedEntries) => {
+        return fixedEntries.push({
+          field: 'outputs',
+          index: i,
+        });
+      });
+    }
+    return txSkeleton;
+  }
+
+  async buildXUDTOutput(
+    txSkeleton: TransactionSkeletonType,
+    records: MintAssetRecord[],
+  ): Promise<TransactionSkeletonType> {
+    for (const record of records) {
+      asserts(record.amount !== 0n, '0 amount should be filtered');
+      const recipientLockscript = parseAddress(record.recipient);
+      const bridgeCellLockscript = {
+        codeHash: ForceBridgeCore.config.ckb.deps.bridgeLock.script.codeHash,
+        hashType: ForceBridgeCore.config.ckb.deps.bridgeLock.script.hashType,
+        args: record.asset.toBridgeLockscriptArgs(),
+      };
+      const outputXUDTCell = <Cell>{
+        cellOutput: {
+          capacity: '0x0',
+          lock: recipientLockscript,
+          type: {
+            codeHash: ForceBridgeCore.config.ckb.deps.xudtType.script.codeHash,
+            hashType: ForceBridgeCore.config.ckb.deps.xudtType.script.hashType,
+            args: utils.computeScriptHash(bridgeCellLockscript),
+          },
+        },
+        data: bytes.hexify(number.Uint128LE.pack(record.amount)),
+      };
+      const xUDTCapacity = ForceBridgeCore.config.ckb.xudtSize * 10 ** 8;
+      logger.debug(
+        `check xudtSize: ${JSON.stringify({
+          minimal: minimalCellCapacity(outputXUDTCell).toString(),
+          xUDTCapacity,
+          recipientLockscript,
+          extraData: record.sudtExtraData,
+        })}`,
+      );
+      outputXUDTCell.cellOutput.capacity = `0x${xUDTCapacity.toString(16)}`;
+      txSkeleton = txSkeleton.update('outputs', (outputs) => {
+        return outputs.push(outputXUDTCell);
       });
     }
     for (let i = 1; i <= records.length; i++) {
