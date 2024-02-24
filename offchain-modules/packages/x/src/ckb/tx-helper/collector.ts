@@ -1,6 +1,7 @@
 import { Script, utils, Cell } from '@ckb-lumos/base';
 import { SearchKey, ScriptType } from '@ckb-lumos/ckb-indexer/src/type';
-import { Indexer as CkbIndexer } from '@ckb-lumos/lumos';
+import { number } from '@ckb-lumos/codec';
+import { BI, Indexer as CkbIndexer } from '@ckb-lumos/lumos';
 import { logger } from '../../utils/logger';
 import { Terminator } from './indexer';
 
@@ -49,6 +50,22 @@ export class IndexerCollector extends Collector {
     };
     const cells = await this.indexer.getCells(searchKey, terminator);
     return cells.objects;
+  }
+
+  async collectXUDTByAmount(searchKey: SearchKey, amount: BI): Promise<{ cells: Cell[]; balance: BI }> {
+    let balance = BI.from(0);
+    const terminator: Terminator = (_, c) => {
+      const cell = c;
+      if (balance.lt(amount)) {
+        balance = balance.add(number.Uint128LE.unpack(cell.data));
+        return { stop: false, push: true };
+      }
+
+      return { stop: true, push: false };
+    };
+
+    const cells = await this.indexer.getCells(searchKey, terminator);
+    return { cells: cells.objects, balance };
   }
 
   async getBalance(lock: Script): Promise<bigint> {

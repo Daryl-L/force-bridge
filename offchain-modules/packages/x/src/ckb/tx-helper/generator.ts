@@ -1,8 +1,9 @@
 import { Cell, Script, utils, WitnessArgs as IWitnessArgs } from '@ckb-lumos/base';
 import { WitnessArgs, RawTransaction } from '@ckb-lumos/base/lib/blockchain';
-import { ScriptType } from '@ckb-lumos/ckb-indexer/src/type';
-import { bytes } from '@ckb-lumos/codec';
+import { ScriptType, SearchKey } from '@ckb-lumos/ckb-indexer/src/type';
+import { number, bytes } from '@ckb-lumos/codec';
 import { common } from '@ckb-lumos/common-scripts';
+import {} from '@joyid/ckb';
 import {
   minimalCellCapacity,
   parseAddress,
@@ -10,6 +11,7 @@ import {
   TransactionSkeletonType,
   createTransactionFromSkeleton,
 } from '@ckb-lumos/helpers';
+import { BI, Transaction } from '@ckb-lumos/lumos';
 import { Reader } from 'ckb-js-toolkit';
 import * as lodash from 'lodash';
 import { ForceBridgeCore } from '../../core';
@@ -18,6 +20,7 @@ import { asyncSleep, fromHexString, stringToUint8Array, toHexString, transaction
 import { logger } from '../../utils/logger';
 import { Asset } from '../model/asset';
 import { CkbTxHelper } from './base_generator';
+import { BurnCTMeta } from './generated/btc/burn_ctmeta';
 import { SerializeRecipientCellData } from './generated/eth_recipient_cell';
 import { SerializeMintWitness } from './generated/mint_witness';
 import { SerializeRcLockWitnessLock } from './generated/omni_lock';
@@ -32,6 +35,13 @@ export interface MintAssetRecord {
 }
 
 export class CkbTxGenerator extends CkbTxHelper {
+  xudtDep = {
+    outPoint: {
+      txHash: ForceBridgeCore.config.ckb.deps.xudtType.cellDep.outPoint.txHash,
+      index: ForceBridgeCore.config.ckb.deps.xudtType.cellDep.outPoint.index,
+    },
+    depType: ForceBridgeCore.config.ckb.deps.xudtType.cellDep.depType,
+  };
   sudtDep = {
     outPoint: {
       txHash: ForceBridgeCore.config.ckb.deps.sudtType.cellDep.outPoint.txHash,
@@ -216,6 +226,11 @@ export class CkbTxGenerator extends CkbTxHelper {
     });
     return SerializeMintWitness({ lock_tx_hashes: lockTxHashes });
   }
+
+  // async buildXUDTOutput(
+  //   txSkeleton: TransactionSkeletonType,
+  //   records: MintAssetRecord[],
+  // ): Promise
 
   async buildSudtOutput(
     txSkeleton: TransactionSkeletonType,
@@ -411,44 +426,7 @@ export class CkbTxGenerator extends CkbTxHelper {
     txSkeleton = txSkeleton.update('cellDeps', (cellDeps) => cellDeps.push(this.recipientDep).push(this.sudtDep));
 
     // add change output
-    const changeOutput: Cell = {
-      cellOutput: {
-        capacity: '0x0',
-        lock: fromLockscript,
-      },
-      data: '0x',
-    };
-    const minimalChangeCellCapacity = minimalCellCapacity(changeOutput);
-    changeOutput.cellOutput.capacity = `0x${minimalChangeCellCapacity.toString(16)}`;
-    txSkeleton = txSkeleton.update('outputs', (outputs) => {
-      return outputs.push(changeOutput);
-    });
-    // add inputs
-    const fee = 100000n;
-    const capacityDiff = await this.calculateCapacityDiff(txSkeleton);
-    logger.debug(`capacityDiff`, capacityDiff);
-    const needCapacity = -capacityDiff + fee;
-    if (needCapacity < 0) {
-      txSkeleton = txSkeleton.update('outputs', (outputs) => {
-        changeOutput.cellOutput.capacity = `0x${(minimalChangeCellCapacity - needCapacity).toString(16)}`;
-        return outputs.set(outputs.size - 1, changeOutput);
-      });
-    } else {
-      const fromCells = await this.collector.getCellsByLockscriptAndCapacity(fromLockscript, needCapacity);
-      logger.debug(`fromCells: ${JSON.stringify(fromCells, null, 2)}`);
-      txSkeleton = txSkeleton.update('inputs', (inputs) => {
-        return inputs.concat(fromCells);
-      });
-      const capacityDiff = await this.calculateCapacityDiff(txSkeleton);
-      if (capacityDiff < fee) {
-        const humanReadableCapacityDiff = -capacityDiff / 100000000n + 1n; // 1n is 1 ckb to supply fee
-        throw new Error(`fromAddress capacity insufficient, need ${humanReadableCapacityDiff.toString()} CKB more`);
-      }
-      txSkeleton = txSkeleton.update('outputs', (outputs) => {
-        changeOutput.cellOutput.capacity = `0x${(minimalChangeCellCapacity + capacityDiff - fee).toString(16)}`;
-        return outputs.set(outputs.size - 1, changeOutput);
-      });
-    }
+    txSkeleton = await this.addChangeOutput(txSkeleton, fromLockscript);
 
     const omniLockConfig = ForceBridgeCore.config.ckb.deps.omniLock;
     if (
@@ -500,10 +478,73 @@ export class CkbTxGenerator extends CkbTxHelper {
       });
     }
 
-    logger.debug(`txSkeleton111111111: ${transactionSkeletonToJSON(txSkeleton)}`);
+    logger.debug(`txSkeleton: ${transactionSkeletonToJSON(txSkeleton)}`);
     logger.debug(`final fee: ${await this.calculateCapacityDiff(txSkeleton)}`);
 
     return txSkeleton;
+  }
+
+  async burnBTC(fromLockscript: Script, recipientAddress: string, asset: Asset, amount: BI): Promise<Transaction> {
+    if (amount.eq(0)) {
+      throw new Error('amount should larger then zero');
+    }
+
+    const xudt = {
+      codeHash: ForceBridgeCore.config.ckb.deps.xudtType.script.codeHash,
+      hashType: ForceBridgeCore.config.ckb.deps.xudtType.script.hashType,
+      args: asset.toBridgeLockscriptArgs(),
+    };
+
+    const searchKey: SearchKey = {
+      script: fromLockscript,
+      scriptType: 'lock',
+      filter: { script: xudt },
+    };
+
+    const { cells, balance } = await this.collector.collectXUDTByAmount(searchKey, amount);
+    if (balance.lt(amount)) {
+      throw new Error('xudt amount is not enough');
+    }
+
+    logger.debug('burn xudtCells: ', cells);
+
+    let txSkeleton = TransactionSkeleton({ cellProvider: this.indexer });
+    for (const cell of cells) {
+      txSkeleton = await common.setupInputCell(txSkeleton, cell);
+      txSkeleton = txSkeleton.update('outputs', (outputs) => outputs.clear());
+    }
+
+    const recipientOutput: Cell = {
+      cellOutput: {
+        lock: ForceBridgeCore.config.btc.btcRecipientLock,
+        type: xudt,
+        capacity: '0x0',
+      },
+      data: bytes.hexify(number.Uint128LE.pack(amount)),
+    };
+    const recipientCapacity = minimalCellCapacity(recipientOutput);
+    recipientOutput.cellOutput.capacity = `0x${recipientCapacity.toString(16)}`;
+    logger.debug(`recipientOutput`, recipientOutput);
+    txSkeleton = txSkeleton.update('outputs', (outputs) => outputs.push(recipientOutput));
+    logger.debug(`txSkeleton: ${transactionSkeletonToJSON(txSkeleton)}`);
+
+    const changeAmount = balance.sub(amount);
+    if (changeAmount.gt(0)) {
+      const xudtChangeCell: Cell = lodash.cloneDeep(cells[0]);
+      xudtChangeCell.data = bytes.hexify(number.Uint128LE.pack(changeAmount));
+      xudtChangeCell.cellOutput.capacity = `0x${minimalCellCapacity(xudtChangeCell).toString(16)}`;
+      txSkeleton = txSkeleton.update('outputs', (outputs) => outputs.push(xudtChangeCell));
+    }
+
+    txSkeleton = txSkeleton.update('cellDeps', (cellDeps) => cellDeps.push(this.xudtDep));
+
+    txSkeleton = await this.addChangeOutput(txSkeleton, fromLockscript);
+
+    const tx = createTransactionFromSkeleton(txSkeleton);
+
+    tx.witnesses.push(new BurnCTMeta(recipientAddress).serializeWitness());
+
+    return tx;
   }
 }
 

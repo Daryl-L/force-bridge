@@ -88,6 +88,7 @@ export interface TronConfig {
 }
 
 export interface BtcConfig {
+  btcRecipientLock: Script;
   assetWhiteList: WhiteListAsset[];
   clientParams: {
     url: string;

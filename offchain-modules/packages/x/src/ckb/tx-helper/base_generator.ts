@@ -144,4 +144,47 @@ export class CkbTxHelper {
       await asyncSleep(1000);
     }
   }
+
+  async addChangeOutput(txSkeleton: TransactionSkeletonType, fromLockscript: Script): Promise<TransactionSkeletonType> {
+    const changeOutput: Cell = {
+      cellOutput: {
+        capacity: '0x0',
+        lock: fromLockscript,
+      },
+      data: '0x',
+    };
+    const minimalChangeCellCapacity = minimalCellCapacity(changeOutput);
+    changeOutput.cellOutput.capacity = `0x${minimalChangeCellCapacity.toString(16)}`;
+    txSkeleton = txSkeleton.update('outputs', (outputs) => {
+      return outputs.push(changeOutput);
+    });
+    // add inputs
+    const fee = 100000n;
+    const capacityDiff = await this.calculateCapacityDiff(txSkeleton);
+    logger.debug(`capacityDiff`, capacityDiff);
+    const needCapacity = -capacityDiff + fee;
+    if (needCapacity < 0) {
+      txSkeleton = txSkeleton.update('outputs', (outputs) => {
+        changeOutput.cellOutput.capacity = `0x${(minimalChangeCellCapacity - needCapacity).toString(16)}`;
+        return outputs.set(outputs.size - 1, changeOutput);
+      });
+    } else {
+      const fromCells = await this.collector.getCellsByLockscriptAndCapacity(fromLockscript, needCapacity);
+      logger.debug(`fromCells: ${JSON.stringify(fromCells, null, 2)}`);
+      txSkeleton = txSkeleton.update('inputs', (inputs) => {
+        return inputs.concat(fromCells);
+      });
+      const capacityDiff = await this.calculateCapacityDiff(txSkeleton);
+      if (capacityDiff < fee) {
+        const humanReadableCapacityDiff = -capacityDiff / 100000000n + 1n; // 1n is 1 ckb to supply fee
+        throw new Error(`fromAddress capacity insufficient, need ${humanReadableCapacityDiff.toString()} CKB more`);
+      }
+      txSkeleton = txSkeleton.update('outputs', (outputs) => {
+        changeOutput.cellOutput.capacity = `0x${(minimalChangeCellCapacity + capacityDiff - fee).toString(16)}`;
+        return outputs.set(outputs.size - 1, changeOutput);
+      });
+    }
+
+    return txSkeleton;
+  }
 }

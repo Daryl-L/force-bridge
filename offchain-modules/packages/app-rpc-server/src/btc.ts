@@ -1,4 +1,6 @@
-import { utils, helpers, Script } from '@ckb-lumos/lumos';
+import { utils, helpers, Script, BI } from '@ckb-lumos/lumos';
+import { BtcAsset } from '@force-bridge/x/dist/ckb/model/asset';
+import { CkbTxGenerator } from '@force-bridge/x/dist/ckb/tx-helper/generator';
 import { ForceBridgeCore } from '@force-bridge/x/dist/core';
 import { BtcDb } from '@force-bridge/x/dist/db';
 import { LockRecord, UnlockRecord } from '@force-bridge/x/dist/db/model';
@@ -76,9 +78,25 @@ export class BTCAPI implements ForceBridgeAPIV1 {
     payload: GenerateBridgeInTransactionPayload,
   ) => Promise<GenerateTransactionResponse<T>>;
 
-  generateBridgeOutNervosTransaction: <T extends Required<NetworkBase>>(
+  generateBridgeOutNervosTransaction = async <T extends Required<NetworkBase>>(
     payload: GenerateBridgeOutNervosTransactionPayload,
-  ) => Promise<GenerateTransactionResponse<T>>;
+  ): Promise<GenerateTransactionResponse<T>> => {
+    const { sender, recipient, asset, amount } = payload;
+    const ckbTxGenerator = new CkbTxGenerator(
+      ForceBridgeCore.config.ckb.ckbRpcUrl,
+      ForceBridgeCore.config.ckb.ckbIndexerUrl,
+    );
+
+    return {
+      network: 'Nervos',
+      rawTransaction: await ckbTxGenerator.burnBTC(
+        helpers.parseAddress(sender),
+        recipient,
+        new BtcAsset(asset),
+        BI.from(amount),
+      ),
+    };
+  };
 
   sendSignedTransaction: <T extends NetworkBase>(payload: SignedTransactionPayload<T>) => Promise<TransactionIdent>;
 
