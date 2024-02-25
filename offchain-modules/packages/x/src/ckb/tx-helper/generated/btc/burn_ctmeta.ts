@@ -6,13 +6,15 @@ export class BurnCTMeta {
   recipient: string;
 
   static fromWitness(witness: string): BurnCTMeta | undefined {
-    let { lock } = WitnessArgs.unpack(witness);
-    if (!lock) {
+    let { inputType } = WitnessArgs.unpack(witness);
+    if (!inputType) {
       return undefined;
     }
 
-    const recipientLength = number.Uint128LE.unpack(bytes.bytify(lock.substring(2, 34)));
-    const recipient = new TextDecoder().decode(bytes.bytify(lock.substring(34, recipientLength.add(34).toNumber())));
+    const recipientLength = number.Uint128LE.unpack(bytes.bytify(inputType.substring(2, 34)));
+    const recipient = new TextDecoder().decode(
+      bytes.bytify(inputType.substring(34, recipientLength.add(34).toNumber())),
+    );
 
     return new BurnCTMeta(recipient);
   }
@@ -27,7 +29,7 @@ export class BurnCTMeta {
 
     return bytes.hexify(
       WitnessArgs.pack({
-        lock: `${recipientLength}${recipient.substring(2, recipient.length)}`,
+        inputType: `${recipientLength}${recipient.substring(2, recipient.length)}`,
       }),
     );
   }

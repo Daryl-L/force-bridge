@@ -21,6 +21,7 @@ import { logger } from '../../utils/logger';
 import { Asset } from '../model/asset';
 import { CkbTxHelper } from './base_generator';
 import { BurnCTMeta } from './generated/btc/burn_ctmeta';
+import { BTCMintWitness } from './generated/btc/mint_witness';
 import { SerializeRecipientCellData } from './generated/eth_recipient_cell';
 import { SerializeMintWitness } from './generated/mint_witness';
 import { SerializeRcLockWitnessLock } from './generated/omni_lock';
@@ -172,15 +173,14 @@ export class CkbTxGenerator extends CkbTxHelper {
           return cellDeps.push(this.xudtDep);
         });
 
-        const mintWitness = this.getMintWitness(records);
-        const mintWitnessArgs = bytes.hexify(WitnessArgs.pack({ inputType: mintWitness }));
+        const mintWitnessArgs = new BTCMintWitness(records.map((r) => r.id)).serializeWitness();
         txSkeleton = txSkeleton.update('witnesses', (witnesses) => {
           if (witnesses.isEmpty()) {
             return witnesses.push(`0x${mintWitnessArgs}`);
           }
           const witnessArgs = WitnessArgs.unpack(bytes.bytify(witnesses.get(0) as string));
           const newWitnessArgs: IWitnessArgs = {
-            inputType: `0x${toHexString(new Uint8Array(mintWitness))}`,
+            inputType: witnessArgs.inputType,
           };
           if (witnessArgs.lock) {
             newWitnessArgs.lock = new Reader(witnessArgs.lock).serializeJson();

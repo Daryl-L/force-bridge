@@ -1,6 +1,7 @@
 import { utils } from '@ckb-lumos/base';
 import { WitnessArgs } from '@ckb-lumos/base/lib/blockchain';
 import { IndexerTransaction, ScriptType, SearchKey } from '@ckb-lumos/ckb-indexer/src/type';
+import { number, bytes } from '@ckb-lumos/codec';
 import { bytify } from '@ckb-lumos/codec/lib/bytes';
 import { serializeMultisigScript } from '@ckb-lumos/common-scripts/lib/secp256k1_blake160_multisig';
 import { key } from '@ckb-lumos/hd';
@@ -15,6 +16,8 @@ import { RPC } from '@ckb-lumos/rpc';
 import { BigNumber } from 'bignumber.js';
 import * as lodash from 'lodash';
 import { BtcAsset, ChainType, EosAsset, EthAsset, getAsset, TronAsset } from '../ckb/model/asset';
+import { BurnCTMeta } from '../ckb/tx-helper/generated/btc/burn_ctmeta';
+import { BTCMintWitness } from '../ckb/tx-helper/generated/btc/mint_witness';
 import { RecipientCellData } from '../ckb/tx-helper/generated/eth_recipient_cell';
 import { ForceBridgeLockscriptArgs } from '../ckb/tx-helper/generated/force_bridge_lockscript';
 import { MintWitness } from '../ckb/tx-helper/generated/mint_witness';
@@ -256,6 +259,29 @@ export class CkbHandler {
     return result;
   }
 
+  async handleBTCTx(fromBlockNum: number, toBlockNum: number, currentHeight: number): Promise<void> {
+    const txs = await this.getTransactions({
+      filter: { blockRange: ['0x' + fromBlockNum.toString(16), '0x' + (toBlockNum + 1).toString(16)] },
+      script: ForceBridgeCore.config.btc.btcRecipientLock,
+      scriptType: 'lock',
+    });
+
+    for (const tx of txs) {
+      const burnWitness = BurnCTMeta.fromWitness(tx.tx.transaction.witnesses[0]);
+      if (burnWitness) {
+        await this.onBurnTx(tx, currentHeight);
+      }
+      const mintWitness = BTCMintWitness.fromWitness(tx.tx.transaction.witnesses[0]);
+      if (mintWitness) {
+        const parsedMintRecords = await this.parseBTCMintTx(tx.tx.transaction, Number(tx.info.blockNumber));
+        if (parsedMintRecords) {
+          await this.onMintTx(currentHeight, parsedMintRecords);
+          BridgeMetricSingleton.getInstance(this.role).addBridgeTxMetrics('ckb_mint', 'success');
+        }
+      }
+    }
+  }
+
   async handleTxs(fromBlockNum: number, toBlockNum: number, currentHeight: number): Promise<void> {
     const mintSearchKey: SearchKey = {
       filter: { blockRange: ['0x' + fromBlockNum.toString(16), '0x' + (toBlockNum + 1).toString(16)] },
@@ -394,6 +420,61 @@ export class CkbHandler {
     }
   }
 
+  async parseBTCMintTx(tx: Transaction, blockNumber: number): Promise<undefined | MintedRecords> {
+    let isInputsContainRecipientCell = false;
+    const witness = BTCMintWitness.fromWitness(tx.witnesses[0]);
+    if (!witness) {
+      return undefined;
+    }
+    for (const input of tx.inputs) {
+      const previousOutput = nonNullable(input.previousOutput);
+      const previousHash = previousOutput.txHash;
+      const previousTx = await this.ckb.rpc.getTransaction(previousHash);
+      if (!previousTx) {
+        continue;
+      }
+
+      const inputLock = previousTx.transaction.outputs[Number(previousOutput.index)].lock;
+      if (
+        inputLock.codeHash === ForceBridgeCore.config.btc.btcRecipientLock.codeHash &&
+        inputLock.hashType === ForceBridgeCore.config.btc.btcRecipientLock.hashType &&
+        inputLock.args === ForceBridgeCore.config.btc.btcRecipientLock.args
+      ) {
+        isInputsContainRecipientCell = true;
+        break;
+      }
+    }
+
+    if (!isInputsContainRecipientCell) {
+      return undefined;
+    }
+
+    const mintedXUDTCellIndexes = tx.outputs.reduce((acc, output, index) => {
+      if (
+        output.type &&
+        output.type.codeHash === ForceBridgeCore.config.ckb.deps.xudtType.script.codeHash &&
+        output.type.hashType === ForceBridgeCore.config.ckb.deps.xudtType.script.hashType
+      ) {
+        acc.push(index);
+      }
+
+      return acc;
+    }, [] as number[]);
+
+    const parsedResult = mintedXUDTCellIndexes.reduce((acc, i) => {
+      const amount = number.Uint128LE.unpack(bytes.bytify(tx.outputsData[i]).subarray(0, 16));
+      acc.push({
+        amount: amount.toBigInt(),
+        id: witness.lockIds[i],
+        lockTxHash: witness.lockIds[i].split('-')[0],
+        lockBlockHeight: blockNumber,
+      });
+
+      return acc;
+    }, [] as MintedRecord[]);
+    return { txHash: tx.hash, records: parsedResult };
+  }
+
   async parseMintTx(tx: Transaction, blockNumber: number): Promise<null | MintedRecords> {
     let isInputsContainBridgeCell = false;
     for (const input of tx.inputs) {
@@ -530,7 +611,14 @@ export class CkbHandler {
     }
 
     logger.info(`mint for records`, records);
-    const txSkeleton = await generator.mint(records);
+    let txSkeleton: TransactionSkeletonType;
+    if (ForceBridgeCore.config.eth) {
+      txSkeleton = await generator.mint(records);
+    } else if (ForceBridgeCore.config.btc) {
+      txSkeleton = await generator.mintBTC(records);
+    } else {
+      throw new Error('config not set');
+    }
     logger.debug(`mint tx txSkeleton ${transactionSkeletonToJSON(txSkeleton)}`);
     const sigs = await this.collectMintSignatures(txSkeleton, mintRecords);
     for (;;) {
