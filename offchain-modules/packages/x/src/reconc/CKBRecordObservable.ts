@@ -9,9 +9,10 @@ import { Observable, from } from 'rxjs';
 import { map, expand, takeWhile, filter as rxFilter, mergeMap, distinct, retry } from 'rxjs/operators';
 import { Asset } from '../ckb/model/asset';
 import { ScriptLike } from '../ckb/model/script';
-import { RecipientCellData } from '../ckb/tx-helper/generated/eth_recipient_cell';
+import { EthRecipientCellData } from '../ckb/tx-helper/generated/eth/eth_recipient_cell';
 import { ForceBridgeLockscriptArgs } from '../ckb/tx-helper/generated/force_bridge_lockscript';
 import { MintWitness } from '../ckb/tx-helper/generated/mint_witness';
+import { RecipientCellData } from '../ckb/tx-helper/generated/recipient_cell';
 import { ForceBridgeCore } from '../core';
 import { fromHexString, toHexString, uint8ArrayToString } from '../utils';
 
@@ -235,7 +236,7 @@ export class CKBRecordObservable {
         mergeMap((txs) => txs.objects.filter((indexerTx) => indexerTx.ioType === 'output')),
         mergeMap((tx) => rpc.getTransaction(tx.txHash), 20),
         map((tx) => {
-          const recipientCellData = new RecipientCellData(fromHexString(tx.transaction.outputsData[0]).buffer);
+          const recipientCellData = new EthRecipientCellData(fromHexString(tx.transaction.outputsData[0]).buffer);
           return { recipientCellData, txId: tx.transaction.hash };
         }),
         rxFilter((tx) => {
@@ -270,10 +271,9 @@ export class CKBRecordObservable {
         }),
 
         map((item) => {
-          const u128leBuf = new Uint8Array(item.recipientCellData.getAmount().raw());
-          const amount = BigInt('0x' + Buffer.from(u128leBuf).reverse().toString('hex')).toString();
-          const recipient = Buffer.from(new Uint8Array(item.recipientCellData.getRecipientAddress().raw())).toString();
-          const asset = Buffer.from(new Uint8Array(item.recipientCellData.getAsset().raw())).toString();
+          const amount = item.recipientCellData.getAmount().toString();
+          const recipient = item.recipientCellData.getRecipientAddress();
+          const asset = item.recipientCellData.getAsset();
           const chain = item.recipientCellData.getChain();
           return { txId: item.txId, amount, recipient, token: asset, chain };
         }),

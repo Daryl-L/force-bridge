@@ -1,7 +1,6 @@
 import { FromRecord, Reconciler, Reconciliation, ToRecord } from '@force-bridge/reconc';
 import { EthAsset } from '@force-bridge/x/dist/ckb/model/asset';
 import { CKBRecordObservable } from '@force-bridge/x/dist/reconc/CKBRecordObservable';
-import { uint8ArrayToString } from '@force-bridge/x/dist/utils';
 import { firstValueFrom } from 'rxjs';
 import { toArray } from 'rxjs/operators';
 import { EthRecordObservable } from './EthRecordObservable';
@@ -50,9 +49,8 @@ export class EthUnlockReconciler implements Reconciler {
 
     const fromRecords$ = observable.observeBurnRecord({
       filterRecipientData: (data) => {
-        const assetBuffer = data.getAsset().raw();
-        const assetAddress = uint8ArrayToString(new Uint8Array(assetBuffer));
-        const recipientOwnerCellTypeHash = Buffer.from(data.getOwnerCellTypeHash().raw()).toString('hex');
+        const assetAddress = data.getAsset();
+        const recipientOwnerCellTypeHash = data.getOwnerCellTypeHash();
         return (
           this.asset.toLowerCase() === assetAddress.toLowerCase() &&
           compareHex(recipientOwnerCellTypeHash, ownerCellTypeHash)

@@ -573,7 +573,7 @@ export class Monitor {
             fromBlock,
             toBlock,
             filterRecipientData: (data) => {
-              const recipientOwnerCellTypeHash = '0x' + Buffer.from(data.getOwnerCellTypeHash().raw()).toString('hex');
+              const recipientOwnerCellTypeHash = data.getOwnerCellTypeHash();
               return recipientOwnerCellTypeHash === getOwnerTypeHash();
             },
           })

@@ -22,7 +22,7 @@ import { Asset } from '../model/asset';
 import { CkbTxHelper } from './base_generator';
 import { BurnCTMeta } from './generated/btc/burn_ctmeta';
 import { BTCMintWitness } from './generated/btc/mint_witness';
-import { SerializeRecipientCellData } from './generated/eth_recipient_cell';
+import { SerializeRecipientCellData } from './generated/eth/eth_recipient_cell';
 import { SerializeMintWitness } from './generated/mint_witness';
 import { SerializeRcLockWitnessLock } from './generated/omni_lock';
 import { getFromAddr, getMultisigLock, getOwnerTypeHash } from './multisig/multisig_helper';

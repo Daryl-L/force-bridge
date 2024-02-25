@@ -1,3 +1,6 @@
+import { bytes, number } from '@ckb-lumos/codec';
+import { RecipientCellData } from '../recipient_cell';
+
 function dataLengthError(actual, required) {
   throw new Error(`Invalid data length! Required: ${required}, actual: ${actual}`);
 }
@@ -79,10 +82,11 @@ function serializeTable(buffers) {
   return buffer;
 }
 
-export class RecipientCellData {
-  private view;
+export class EthRecipientCellData extends RecipientCellData {
+  private view: DataView;
 
   constructor(reader, { validate = true } = {}) {
+    super();
     this.view = new DataView(assertArrayBuffer(reader));
     if (validate) {
       this.validate();
@@ -108,7 +112,7 @@ export class RecipientCellData {
     const start = 4;
     const offset = this.view.getUint32(start, true);
     const offset_end = this.view.getUint32(start + 4, true);
-    return new Bytes(this.view.buffer.slice(offset, offset_end), { validate: false });
+    return bytes.hexify(this.view.buffer.slice(offset, offset_end));
   }
 
   getChain() {
@@ -122,14 +126,14 @@ export class RecipientCellData {
     const start = 12;
     const offset = this.view.getUint32(start, true);
     const offset_end = this.view.getUint32(start + 4, true);
-    return new Bytes(this.view.buffer.slice(offset, offset_end), { validate: false });
+    return bytes.hexify(this.view.buffer.slice(offset, offset_end));
   }
 
   getBridgeLockCodeHash() {
     const start = 16;
     const offset = this.view.getUint32(start, true);
     const offset_end = this.view.getUint32(start + 4, true);
-    return new Byte32(this.view.buffer.slice(offset, offset_end), { validate: false });
+    return bytes.hexify(this.view.buffer.slice(offset, offset_end));
   }
 
   getBridgeLockHashType() {
@@ -143,14 +147,14 @@ export class RecipientCellData {
     const start = 24;
     const offset = this.view.getUint32(start, true);
     const offset_end = this.view.getUint32(start + 4, true);
-    return new Byte32(this.view.buffer.slice(offset, offset_end), { validate: false });
+    return bytes.hexify(this.view.buffer.slice(offset, offset_end));
   }
 
   getAmount() {
     const start = 28;
     const offset = this.view.getUint32(start, true);
     const offset_end = this.view.byteLength;
-    return new Uint128(this.view.buffer.slice(offset, offset_end), { validate: false });
+    return number.Uint128LE.unpack(this.view.buffer.slice(offset, offset_end));
   }
 }
 
