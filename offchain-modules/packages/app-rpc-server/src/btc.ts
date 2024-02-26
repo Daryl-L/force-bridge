@@ -48,7 +48,7 @@ export class BTCAPI implements ForceBridgeAPIV1 {
   constructor(conn: Connection) {
     this.#connection = conn;
     this.#dbHandler = new BtcDb(this.#connection);
-    this.#btcChain = new BTCChain();
+    this.#btcChain = new BTCChain(this.#dbHandler);
   }
 
   login = async (payload: LoginPayload): Promise<LoginResponse> => {

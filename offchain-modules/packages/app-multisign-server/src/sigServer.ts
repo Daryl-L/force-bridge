@@ -14,6 +14,7 @@ import { ethers } from 'ethers';
 import { JSONRPCServer } from 'json-rpc-2.0';
 import * as snappy from 'snappy';
 import { Connection } from 'typeorm';
+import { signBTC } from './btcSigner';
 import { signCkbTx } from './ckbSigner';
 import { SigError, SigErrorCode } from './error';
 import { signEthTx } from './ethSigner';
@@ -175,6 +176,14 @@ export async function startSigServer(configPath: string): Promise<void> {
       return await signEthTx(params);
     } catch (e) {
       logger.error(`signEthTx params:${JSON.stringify(params)} error:${e.stack}`);
+      return SigResponse.fromSigError(SigErrorCode.UnknownError, e.message);
+    }
+  });
+  server.addMethod('signBTC', async (params: collectSignaturesParams) => {
+    try {
+      return await signBTC(params);
+    } catch (e) {
+      logger.error(`signBTC params:${JSON.stringify(params)} error:${e.stack}`);
       return SigResponse.fromSigError(SigErrorCode.UnknownError, e.message);
     }
   });

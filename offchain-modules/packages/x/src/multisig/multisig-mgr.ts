@@ -6,6 +6,7 @@ import { MultiSignHost } from '../config';
 import { ForceBridgeCore } from '../core';
 import { asyncSleep } from '../utils';
 import { logger } from '../utils/logger';
+import { BTCUnlockRecord } from '../xchain/btc';
 import { EthUnlockRecord } from '../xchain/eth';
 import { httpRequest } from './client';
 import { verifyCollector } from './utils';
@@ -27,6 +28,10 @@ export interface ethCollectSignaturesPayload {
   typeHash: string;
   unlockRecords: EthUnlockRecord[];
   nonce: number;
+}
+
+export interface BTCCollectSignaturesPayload {
+  unlockRecords: BTCUnlockRecord[];
 }
 
 export type SigType = 'mint' | 'create_cell' | 'unlock';
@@ -52,7 +57,10 @@ export interface ckbCollectSignaturesPayload {
   txSkeleton: TransactionSkeletonObject;
 }
 
-export type collectSignaturesParamsPayload = ethCollectSignaturesPayload | ckbCollectSignaturesPayload;
+export type collectSignaturesParamsPayload =
+  | ethCollectSignaturesPayload
+  | ckbCollectSignaturesPayload
+  | BTCCollectSignaturesPayload;
 
 export interface collectSignaturesParams {
   rawData: string;

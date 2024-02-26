@@ -1,6 +1,8 @@
 // invoke in BTC handler
 import { Connection, Not, Repository } from 'typeorm';
 import { ForceBridgeCore } from '../core';
+import { asserts } from '../errors';
+import { IVout } from '../xchain/btc';
 import { Account } from './entity/Account';
 import { BtcUnlockStatus } from './entity/BtcUnlock';
 import {
@@ -27,6 +29,16 @@ export class BtcDb implements IQuery {
     this.btcLockRepository = connection.getRepository(BtcLock);
     this.btcUnlockRepository = connection.getRepository(BtcUnlock);
     this.btcAccountRepository = connection.getRepository(Account);
+  }
+
+  async findByBTCTxOut(txVouts: IVout): Promise<Account | undefined> {
+    const addresses = txVouts.scriptPubKey.addresses;
+    asserts(addresses);
+
+    if (addresses.length != 1) {
+      return undefined;
+    }
+    return this.btcAccountRepository.findOne({ btcAddress: addresses[0] });
   }
 
   async createBtcAccount(ckbAddress: string, lockHash: string, btcAddress: string): Promise<void> {

@@ -116,6 +116,9 @@ export class ForceBridgeCore {
       if (config.eth && config.eth.privateKey) {
         config.eth.privateKey = keystore.getDecryptedByKeyID(config.eth.privateKey);
       }
+      if (config.btc) {
+        config.btc.privateKey = keystore.getDecryptedByKeyID(config.btc.privateKey);
+      }
     }
 
     // write static

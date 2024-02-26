@@ -1,4 +1,5 @@
 export type BtcLockData = {
+  recipient: string;
   txId: string;
   txHash: string;
   sender: string;
@@ -84,4 +85,11 @@ export interface Multisig {
   address: string;
   redeemScript: string;
   descriptor: string;
+}
+
+export interface BTCUnlockRecord {
+  token: string;
+  recipient: string;
+  amount: string;
+  ckbTxHash: string;
 }

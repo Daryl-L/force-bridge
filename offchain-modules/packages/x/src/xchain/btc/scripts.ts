@@ -4,10 +4,13 @@ import axios from 'axios';
 import bitcore from 'bitcore-lib';
 import { RPCClient } from 'rpc-bitcoin';
 import { ForceBridgeCore } from '../../core';
+import { BtcDb } from '../../db';
 import { BtcUnlock } from '../../db/entity/BtcUnlock';
 import { asserts, nonNullable } from '../../errors';
+import { MultiSigMgr } from '../../multisig/multisig-mgr';
 import { logger } from '../../utils/logger';
 import {
+  BTCUnlockRecord,
   BtcLockData,
   BtcUnlockResult,
   IBalance,
@@ -31,16 +34,20 @@ export class BTCChain {
   protected readonly multiAddress: string;
   protected readonly multiPubkeys;
   protected readonly multiPrivKeys;
+  protected readonly multisigMgr: MultiSigMgr;
 
-  constructor() {
+  constructor(protected readonly _db: BtcDb) {
     const config = ForceBridgeCore.config.btc;
+    this.multisigMgr = new MultiSigMgr('ETH', config.multiSignHosts, config.multiSignThreshold);
+    this.multiPubkeys = ForceBridgeCore.config.btc.multiSignPublicKeys;
     const clientParams = config.clientParams;
-    const privKeys = config.privateKeys;
-    this.multiPrivKeys = privKeys.map((pk) => new bitcore.PrivateKey(pk.slice(2)));
-    this.multiPubkeys = config.verifierPublicKeys;
-    const multiAddress = bitcore.Address.createMultisig(this.multiPubkeys, 2, 'testnet').toString();
+    const multiAddress = bitcore.Address.createMultisig(
+      this.multiPubkeys,
+      config.multiSignThreshold,
+      config.network,
+    ).toString();
     logger.debug(
-      `the multi sign address by calc privkeys is : ${multiAddress}. the provider lock address is ${config.lockAddress}`,
+      `the multi sign address by calc public keys is : ${multiAddress}. the provider lock address is ${config.lockAddress}`,
     );
     if (multiAddress !== config.lockAddress) {
       throw new Error(
@@ -87,8 +94,10 @@ export class BTCChain {
             await handleUnlockAsyncFunc(ckbBurnTxHashes[i]);
           }
         }
-        if (this.isLockTx(txVouts)) {
+        const account = await this._db.findByBTCTxOut(txVouts[0]);
+        if (account) {
           const data: BtcLockData = {
+            recipient: account.ckbAddress,
             blockHeight: block.height,
             blockHash: block.hash,
             txId: waitVerifyTxs[txIndex].txid,
@@ -156,6 +165,13 @@ export class BTCChain {
     return lockTxHash;
   }
 
+  async collectUnlockSignatures(txToSign: string, unlockRecords: BTCUnlockRecord[]): Promise<boolean | string[]> {
+    return await this.multisigMgr.collectSignatures({
+      rawData: txToSign,
+      payload: { sigType: 'unlock', unlockRecords },
+    });
+  }
+
   async sendUnlockTxs(records: BtcUnlock[]): Promise<BtcUnlockResult> {
     if (records.length === 0) {
       throw new Error('the unlock records should not be null');
@@ -197,7 +213,6 @@ export class BTCChain {
       .from(utxos, this.multiPubkeys, 2)
       .to(unlockVout)
       .addData(BurnTxHashes)
-      .change(this.multiAddress)
       .sign([this.multiPrivKeys[0], this.multiPrivKeys[3]]);
     const txSize = transactionWithoutFee.serialize().length / 2;
     const feeRate = await getBtcMainnetFee();
@@ -206,8 +221,11 @@ export class BTCChain {
       .to(unlockVout)
       .fee(feeRate.hourFee * txSize)
       .addData(BurnTxHashes)
-      .change(this.multiAddress)
-      .sign([this.multiPrivKeys[0], this.multiPrivKeys[3]]);
+      .change(this.multiAddress);
+
+    const unsigned = transaction.uncheckedSerialize();
+    const signatures = await this.collectUnlockSignatures(unsigned, []);
+    transaction.inputs[0].addSignature(transaction, bitcore.crypto.Signature.fromString(signatures[0]));
 
     logger.debug(
       `generate unlock tx ${JSON.stringify(transaction, null, 2)}. the tx fee rate is ${JSON.stringify(
@@ -293,7 +311,7 @@ export class BTCChain {
   }
 }
 
-function getVins(balance: IBalance, unlockAmount: BigInt): IUnspents[] {
+function getVins(balance: IBalance, unlockAmount: bigint): IUnspents[] {
   if (BigInt(Unit.fromBTC(balance.total_amount).toSatoshis()) < unlockAmount || balance.unspents.length === 0) {
     return [];
   }

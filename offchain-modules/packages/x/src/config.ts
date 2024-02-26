@@ -91,6 +91,7 @@ export interface TronConfig {
 export interface BtcConfig {
   btcRecipientLock: Script;
   assetWhiteList: WhiteListAsset[];
+  network: string;
   clientParams: {
     url: string;
     user: string;
@@ -98,15 +99,13 @@ export interface BtcConfig {
     port: number;
     timeout?: number;
   };
-  /**
-   * @deprecated migrate to {@link KeyStore}
-   */
-  privateKeys: string[];
+  privateKey: string;
   lockAddress: string;
   startBlockHeight: number;
   confirmNumber: number;
-  multiSigN: number;
-  verifierPublicKeys: string[];
+  multiSignPublicKeys: string[];
+  multiSignHosts: MultiSignHost[];
+  multiSignThreshold: number;
   xudtFlag: string;
 }
 
