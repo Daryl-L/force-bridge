@@ -1,22 +1,51 @@
 // import { nonNullable } from '@force-bridge/x';
 // import { Account } from '@force-bridge/x/dist/ckb/model/accounts';
-// import { BtcAsset } from '@force-bridge/x/dist/ckb/model/asset';
+import { BtcAsset } from '@force-bridge/x/dist/ckb/model/asset';
+import { initializeConfig } from '@ckb-lumos/config-manager';
 // import { IndexerCollector } from '@force-bridge/x/dist/ckb/tx-helper/collector';
-// import { CkbTxGenerator } from '@force-bridge/x/dist/ckb/tx-helper/generator';
+import { CkbTxGenerator } from '@force-bridge/x/dist/ckb/tx-helper/generator';
 // import { getOwnerTypeHash } from '@force-bridge/x/dist/ckb/tx-helper/multisig/multisig_helper';
-// import { ForceBridgeCore } from '@force-bridge/x/dist/core';
+import { ForceBridgeCore, bootstrap } from '@force-bridge/x/dist/core';
 // import { asyncSleep } from '@force-bridge/x/dist/utils';
 // import { logger } from '@force-bridge/x/dist/utils/logger';
 // import { BTCChain, getBtcMainnetFee, IBalance } from '@force-bridge/x/dist/xchain/btc';
 // import { Amount } from '@lay2/pw-core';
 // import bitcore from 'bitcore-lib';
-// import commander from 'commander';
+import commander from 'commander';
 // import { RPCClient } from 'rpc-bitcoin';
 // import { getSudtBalance, parseOptions, waitUnlockTxCompleted } from './utils';
 //
 // const Unit = bitcore.Unit;
 //
-// export const btcCmd = new commander.Command('btc');
+const doMintBTC = async (opts: Record<string, string>) => {
+  initializeConfig();
+  const generator = new CkbTxGenerator(opts.ckbRpcUrl, opts.ckbIndexerUrl);
+  try {
+    const txSkeleton = await generator.mintBTC([
+      {
+        id: 'test',
+        asset: new BtcAsset('btc'),
+        amount: BigInt(opts.amount),
+        recipient: opts.userAddr,
+        sudtExtraData: '',
+      },
+    ]);
+
+    console.log(txSkeleton);
+  } catch (e) {
+    console.log(e);
+  }
+};
+
+export const btcCmd = new commander.Command('btc');
+btcCmd
+  .command('mint-btc')
+  .requiredOption('-p, --privateKey', 'private key of issue owner')
+  .requiredOption('-u, --userAddr', 'address on btc')
+  .requiredOption('-a, --amount', 'amount to mint')
+  .option('--ckbRpcUrl <ckbRpcUrl>', 'Url of ckb rpc')
+  .action(doMintBTC);
+
 // btcCmd
 //   .command('lock')
 //   .requiredOption('-p, --privateKey', 'private key of locked account')

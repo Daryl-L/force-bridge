@@ -20,6 +20,7 @@ export class CkbTxHelper {
   lumosConfig: Config;
 
   constructor(ckbRpcUrl: string, ckbIndexerUrl: string) {
+    console.log(333);
     this.ckbRpcUrl = ckbRpcUrl;
     this.ckbIndexerUrl = ckbIndexerUrl;
     this.indexer = new Indexer(ckbRpcUrl, ckbIndexerUrl);

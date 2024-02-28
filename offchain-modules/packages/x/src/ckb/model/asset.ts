@@ -28,11 +28,13 @@ export abstract class Asset {
       return;
     }
 
-    this.ownerCellTypeHash = ForceBridgeCore.ckb.utils.scriptToHash(<CKBComponents.Script>{
-      codeHash: ForceBridgeCore.config.ckb.ownerCellTypescript.codeHash,
-      hashType: ForceBridgeCore.config.ckb.ownerCellTypescript.hashType,
-      args: ForceBridgeCore.config.ckb.ownerCellTypescript.args,
-    });
+    if (ForceBridgeCore.config.ckb.ownerCellTypescript) {
+      this.ownerCellTypeHash = ForceBridgeCore.ckb.utils.scriptToHash(<CKBComponents.Script>{
+        codeHash: ForceBridgeCore.config.ckb.ownerCellTypescript.codeHash,
+        hashType: ForceBridgeCore.config.ckb.ownerCellTypescript.hashType,
+        args: ForceBridgeCore.config.ckb.ownerCellTypescript.args,
+      });
+    }
   }
 
   public toTypeScript(): ScriptLike {
@@ -208,7 +210,6 @@ export class BtcAsset extends Asset {
 
   toBridgeLockscriptArgs(): string {
     const buffers: ArrayBuffer[] = [];
-    buffers.push(SerializeByte32(fromHexString(this.ownerCellTypeHash).buffer));
     const chainView = new DataView(new ArrayBuffer(1));
     chainView.setUint8(0, this.chainType);
     buffers.push(chainView.buffer);

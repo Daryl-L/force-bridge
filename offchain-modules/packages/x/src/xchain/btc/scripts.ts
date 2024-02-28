@@ -22,6 +22,8 @@ import {
   MainnetFee,
   Multisig,
 } from '../../xchain/btc/type';
+import bs58 from 'bs58';
+import crypto from 'crypto';
 
 const Unit = bitcore.Unit;
 const BtcLockEventMark = 'ck';
@@ -35,9 +37,11 @@ export class BTCChain {
   protected readonly multiPubkeys;
   protected readonly multiPrivKeys;
   protected readonly multisigMgr: MultiSigMgr;
+  protected readonly threshold: number;
 
   constructor(protected readonly _db: BtcDb) {
     const config = ForceBridgeCore.config.btc;
+    this.threshold = config.multiSignThreshold;
     this.multisigMgr = new MultiSigMgr('ETH', config.multiSignHosts, config.multiSignThreshold);
     this.multiPubkeys = ForceBridgeCore.config.btc.multiSignPublicKeys;
     const clientParams = config.clientParams;
@@ -46,23 +50,19 @@ export class BTCChain {
       config.multiSignThreshold,
       config.network,
     ).toString();
-    logger.debug(
-      `the multi sign address by calc public keys is : ${multiAddress}. the provider lock address is ${config.lockAddress}`,
-    );
-    if (multiAddress !== config.lockAddress) {
-      throw new Error(
-        `the multi sign address by calc privkeys is : ${multiAddress}. which different ${config.lockAddress} in conf.`,
-      );
-    }
+    logger.debug(`the multi sign address by calc public keys is : ${multiAddress}. `);
     this.multiAddress = multiAddress;
     this.rpcClient = new RPCClient(clientParams);
   }
 
   async createMultisigAddressFromCKBLockscript(lock: Script): Promise<Multisig> {
     const lockHash = computeScriptHash(lock);
+    const hash = crypto.createHash('sha256').update(lockHash).digest();
+    const privateKey = new bitcore.PrivateKey(hash);
+    const publicKey = privateKey.toPublicKey();
     const multisig: Multisig = await this.rpcClient.createmultisig({
-      nrequired: 3,
-      keys: [lockHash, ...this.multiPubkeys],
+      nrequired: this.threshold,
+      keys: [publicKey.toString(), ...this.multiPubkeys],
       address_type: 'p2sh-segwit',
     });
 

@@ -58,7 +58,7 @@ export class BTCAPI implements ForceBridgeAPIV1 {
       throw new Error('invalid ckb address or lockscript not support');
     }
 
-    const lockHash = utils.computeScriptHash(lock);
+    const lockHash = utils.computeScriptHash(lock).substring(2);
     const account = await this.#dbHandler.getBtcAccountByCkbAddress(ckbAddress, lockHash);
     if (account) {
       const { ckbAddress, btcAddress: xchainAddress } = account;

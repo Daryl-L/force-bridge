@@ -97,7 +97,10 @@ export class ForceBridgeCore {
   }
 
   async init(config: Config): Promise<ForceBridgeCore> {
-    checkConfigEthereumAddress(config);
+    console.log(22222);
+    if (config.eth) {
+      checkConfigEthereumAddress(config);
+    }
 
     // init log
     initLog(config.common.log);

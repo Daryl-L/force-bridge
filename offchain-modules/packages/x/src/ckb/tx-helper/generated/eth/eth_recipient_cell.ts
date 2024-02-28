@@ -1,5 +1,6 @@
-import { bytes, number } from '@ckb-lumos/codec';
+import { number } from '@ckb-lumos/codec';
 import { RecipientCellData } from '../recipient_cell';
+import { toHexString, uint8ArrayToString } from '../../../../utils';
 
 function dataLengthError(actual, required) {
   throw new Error(`Invalid data length! Required: ${required}, actual: ${actual}`);
@@ -112,7 +113,9 @@ export class EthRecipientCellData extends RecipientCellData {
     const start = 4;
     const offset = this.view.getUint32(start, true);
     const offset_end = this.view.getUint32(start + 4, true);
-    return bytes.hexify(this.view.buffer.slice(offset, offset_end));
+    return uint8ArrayToString(
+      new Uint8Array(new Bytes(this.view.buffer.slice(offset, offset_end), { validate: false }).raw()),
+    );
   }
 
   getChain() {
@@ -126,14 +129,18 @@ export class EthRecipientCellData extends RecipientCellData {
     const start = 12;
     const offset = this.view.getUint32(start, true);
     const offset_end = this.view.getUint32(start + 4, true);
-    return bytes.hexify(this.view.buffer.slice(offset, offset_end));
+    return uint8ArrayToString(
+      new Uint8Array(new Bytes(this.view.buffer.slice(offset, offset_end), { validate: false }).raw()),
+    );
   }
 
   getBridgeLockCodeHash() {
     const start = 16;
     const offset = this.view.getUint32(start, true);
     const offset_end = this.view.getUint32(start + 4, true);
-    return bytes.hexify(this.view.buffer.slice(offset, offset_end));
+    return `0x${toHexString(
+      new Uint8Array(new Byte32(this.view.buffer.slice(offset, offset_end), { validate: false }).raw()),
+    )}`;
   }
 
   getBridgeLockHashType() {
@@ -147,14 +154,20 @@ export class EthRecipientCellData extends RecipientCellData {
     const start = 24;
     const offset = this.view.getUint32(start, true);
     const offset_end = this.view.getUint32(start + 4, true);
-    return bytes.hexify(this.view.buffer.slice(offset, offset_end));
+    return `0x${toHexString(
+      new Uint8Array(new Byte32(this.view.buffer.slice(offset, offset_end), { validate: false }).raw()),
+    )}`;
   }
 
   getAmount() {
     const start = 28;
     const offset = this.view.getUint32(start, true);
     const offset_end = this.view.byteLength;
-    return number.Uint128LE.unpack(this.view.buffer.slice(offset, offset_end));
+    return number.Uint128LE.unpack(
+      `0x${toHexString(
+        new Uint8Array(new Uint128(this.view.buffer.slice(offset, offset_end), { validate: false }).raw()),
+      )}`,
+    );
   }
 }
 

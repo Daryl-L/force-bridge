@@ -1,0 +1,14 @@
+[
+  {
+    "address": "btc",
+    "name": "BTC",
+    "symbol": "BTC",
+    "decimal": 9,
+    "logoURI": "https://cryptologos.cc/logos/ethereum-eth-logo.svg?v=002",
+    "minimalBridgeAmount": "1000000",
+    "bridgeFee": {
+      "in": "10000",
+      "out": "20000"
+    }
+  }
+]

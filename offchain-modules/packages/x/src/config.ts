@@ -89,6 +89,7 @@ export interface TronConfig {
 }
 
 export interface BtcConfig {
+  multisigCollectAddress: string;
   btcRecipientLock: Script;
   assetWhiteList: WhiteListAsset[];
   network: string;
@@ -100,7 +101,6 @@ export interface BtcConfig {
     timeout?: number;
   };
   privateKey: string;
-  lockAddress: string;
   startBlockHeight: number;
   confirmNumber: number;
   multiSignPublicKeys: string[];

@@ -153,6 +153,7 @@ export class CkbTxGenerator extends CkbTxHelper {
   }
 
   async mintBTC(records: MintAssetRecord[]): Promise<TransactionSkeletonType> {
+    console.log(111111);
     for (;;) {
       try {
         const fromAddress = getFromAddr();
@@ -595,6 +596,8 @@ export class CkbTxGenerator extends CkbTxHelper {
       hashType: ForceBridgeCore.config.ckb.deps.xudtType.script.hashType,
       args: asset.toBridgeLockscriptArgs(),
     };
+
+    console.log(xudt);
 
     const searchKey: SearchKey = {
       script: fromLockscript,

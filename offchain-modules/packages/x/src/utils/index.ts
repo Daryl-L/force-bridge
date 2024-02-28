@@ -24,6 +24,7 @@ import { WithdrawedBridgeFee } from '../db/entity/WithdrawedBridgeFee';
 import { KV } from '../db/entity/kv';
 import { Sudt } from '../db/entity/sudt';
 import { nonNullable } from '../errors';
+import { Account } from '../db/entity/Account';
 
 export { asyncSleep, retryPromise, foreverPromise } from './promise';
 
@@ -146,6 +147,7 @@ export async function getDBConnection(): Promise<Connection> {
     synchronize: ormCfg!.synchronize,
     logging: ormCfg!.logging,
     entities: [
+      Account,
       BtcLock,
       BtcUnlock,
       CkbBurn,

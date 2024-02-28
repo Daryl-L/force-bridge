@@ -15,6 +15,7 @@ import {
   LoginPayload,
   XChainNetWork,
 } from './types/apiv1';
+import { API } from './types';
 
 const version = '0.0.38';
 const forceBridgePath = '/force-bridge/api/v1';
@@ -28,7 +29,13 @@ export async function startRpcServer(configPath: string): Promise<void> {
   if (!ForceBridgeCore.config.common.readonly) {
     void startHandlers(conn);
   }
-  const forceBridgeRpc = new ForceBridgeAPIV1Handler(conn);
+
+  let forceBridgeRpc: API.ForceBridgeAPIV1;
+  if (ForceBridgeCore.config.btc) {
+    forceBridgeRpc = new BTCAPI(conn);
+  } else {
+    forceBridgeRpc = new ForceBridgeAPIV1Handler(conn);
+  }
 
   const server = new JSONRPCServer();
   // First parameter is a method name.
@@ -57,7 +64,9 @@ export async function startRpcServer(configPath: string): Promise<void> {
   });
   server.addMethod('Login', async (payload: LoginPayload) => {
     if (forceBridgeRpc instanceof BTCAPI) {
-      return await forceBridgeRpc.login(payload);
+      const res = await forceBridgeRpc.login(payload);
+      console.log(res);
+      return res;
     }
   });
   server.addMethod('generateBridgeOutNervosTransaction', forceBridgeRpc.generateBridgeOutNervosTransaction);
@@ -77,7 +86,7 @@ export async function startRpcServer(configPath: string): Promise<void> {
   server.addMethod('getBalance', async (payload: GetBalancePayload) => {
     return await forceBridgeRpc.getBalance(payload);
   });
-  server.addMethod('getAssetList', async (payload) => {
+  server.addMethod('getAssetList', async (payload: any) => {
     return await forceBridgeRpc.getAssetList(payload);
   });
   server.addMethod('getBridgeConfig', () => forceBridgeRpc.getBridgeConfig());

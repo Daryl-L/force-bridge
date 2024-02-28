@@ -9,6 +9,7 @@ import { keystoreCmd } from './keystore';
 import { monitorCmd } from './monitor';
 import { rpcCmd } from './rpc';
 import { sigCmd } from './sigServer';
+import { btcCmd } from './btc';
 
 export const program = commander.program;
 
@@ -22,6 +23,7 @@ async function main() {
     .addCommand(relayerCmd)
     .addCommand(feeCmd)
     .addCommand(rpcCmd)
+    .addCommand(btcCmd)
     .addCommand(sigCmd)
     .addCommand(monitorCmd)
     .addCommand(configCmd)
